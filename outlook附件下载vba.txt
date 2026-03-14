@@ -1,0 +1,69 @@
+Function FileFolderExists(strFullPath As String) As Boolean     '---判断文件夹是否存在
+    If Not Dir(strFullPath, vbDirectory) = vbNullString Then
+        FileFolderExists = True
+    Else
+        FileFolderExists = False
+    End If
+End Function
+
+Function CreateUniqueFolder(basePath As String, mailID As String) As String
+    Dim uniquePath As String
+    uniquePath = basePath & "\" & mailID
+    CreateUniqueFolder = uniquePath
+End Function
+
+Sub SaveTheAttachment()
+    Dim olApp As New Outlook.Application
+    Dim nmsName As Outlook.NameSpace
+    Dim vItem As Object
+    Dim path As String          '---文件夹名称
+    Dim result As Integer       '---点击弹窗结果
+    Dim myFolder As MAPIFolder
+    Dim fldFolder As MAPIFolder
+    Dim subPath As String       '---子文件夹名称
+
+    On Error GoTo ErrorHandler
+
+    Set nmsName = olApp.GetNamespace("MAPI")
+    Set myFolder = nmsName.GetDefaultFolder(olFolderInbox)
+    Set fldFolder = myFolder.Folders("For Download")    '---如果邮件在别的文件夹，只需要改这里就行
+    
+    path = CreateParentFile("C:\Attachment")            '---如果想换个存放附件的文件夹名称，改这里即可
+    VBA.MkDir (path)            '---创建父文件夹，用于存放所有文件
+        
+    For Each vItem In fldFolder.Items
+        ' 创建一个基于邮件ID的唯一子文件夹
+        subPath = CreateUniqueFolder(path, vItem.EntryID)
+        VBA.MkDir (subPath)
+        
+        '-----Save Attachment-------
+        For Each att In vItem.Attachments
+            att.SaveAsFile subPath & "\" & att.FileName
+        Next
+        '------Save Attachment--------
+    Next
+   
+    Set fldFolder = Nothing
+    Set nmsName = Nothing
+    
+    '------下载完成--------
+    result = MsgBox("附件已下载完成，请至目标文件夹查看！", vbInformation + vbOKOnly, "下载成功") '---提示下载完成
+    Select Case result
+    Case vbOK
+        Shell "explorer.exe " & path, vbNormalFocus '---打开输出文件夹
+    End Select
+    '------下载完成--------
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "发生错误: " & Err.Description, vbCritical, "错误"
+    Set fldFolder = Nothing
+    Set nmsName = Nothing
+End Sub
+
+Function CreateParentFile(strPath As String) As String          '---创建存放所有附件的父文件夹
+    While FileFolderExists(strPath)
+        strPath = strPath & "_" & Timer()
+    Wend
+    CreateParentFile = strPath
+End Function
